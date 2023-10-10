@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from databricks import sql
-import os
 
 
 def main():
