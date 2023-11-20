@@ -23,6 +23,7 @@ dependencies = [
   "plotly",
   "databricks-sql-connector",
   "python-dotenv",
+  "loguru"
 ]
 
 [project.urls]

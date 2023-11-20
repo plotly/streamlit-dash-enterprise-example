@@ -86,3 +86,5 @@ venv.bak/
 
 temp/
 out/
+.ruff_cache/
+.notebooks/
