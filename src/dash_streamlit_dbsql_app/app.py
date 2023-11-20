@@ -63,6 +63,11 @@ def get_top_categories():
     return data_provider.get_top_categories(n=20)
 
 
+@st.cache_data
+def get_selected_categories(categories):
+    return data_provider.get_selected_categories(categories)
+
+
 logger.info("Caching data")
 all_categories = get_all_categories()
 top_categories = get_top_categories()
@@ -71,44 +76,44 @@ logger.info("Data cached")
 
 def app():
     st.title("New York City FourSquare Data app")
-    st.markdown(
-        """ The dataset contains POI (points of interest like restaurants, coffee shops, museums, stadiums, etc.) for the city of New York across all categories.
-                You can easily access this dataset on the Databricks Marketplace.
-                """
-    )
 
     top_c1, top_c2 = st.columns(2, gap="small")
 
     with top_c1:
+        st.markdown(
+            """ The dataset contains POI (points of interest like restaurants, coffee shops, museums, stadiums, etc.) for the city of New York across all categories.
+                You can easily access this dataset on the Databricks Marketplace.
+                """
+        )
         selected = st.multiselect(
             "Select Categories", all_categories, default=["Coffee Shop", "Restaurant"], key="categories"
         )
     with top_c2:
-        st.subheader("Top Categories")
+        st.subheader("Top-20 available categories")
         tc = top_categories.copy()
         tc.columns = ["Category", "Count"]
         st.dataframe(tc, use_container_width=True, hide_index=True)
 
-    c1, c2 = st.columns(2)
+    c1, c2 = st.columns(2, gap="small")
 
     with c1:
         if selected:
             st.subheader("Density Map for the selected categories")
             with st.spinner("Loading data..."):
-                data = data_provider.get_selected_categories(selected)
+                data = get_selected_categories(selected)
 
             if not data.empty:
                 density_map(data)
 
     with c2:
         if selected:
-            st.subheader("Top Associated Categories")
+            st.subheader("Top categories associated with the selected ones")
             with st.spinner("Loading data..."):
                 top_associated = data_provider.get_top_associated(selected, n=10)
 
             if not top_associated.empty:
                 top_associated.columns = ["Category", "Count"]
-                bar = px.bar(top_associated, x="Category", y="Count", title="Top Associated Categories")
+                bar = px.bar(top_associated, x="Category", y="Count")
                 st.plotly_chart(bar, use_container_width=True)
 
 
