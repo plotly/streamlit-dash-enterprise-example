@@ -4,6 +4,7 @@
 
 - Clone the repo
 - Install Python 3.10+ and hatch
+- Configure the environment variables as shown in `.env.example`
 - Run:
 
 ```bash
