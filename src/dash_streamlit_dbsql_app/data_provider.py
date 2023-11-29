@@ -70,3 +70,74 @@ class DataProvider:
             )
             pa_table: pa.Table = cursor.fetchall_arrow()
             return pa_table.to_pandas()
+
+    def get_categories_hierarchy(self, categories: list[str]) -> pd.DataFrame:
+        with self._connection.cursor() as cursor:
+            filter_statement = ",".join([f"'{c}'" for c in categories])
+            cursor.execute(
+                f"""SELECT * from (
+                    WITH ExplodedCategories AS (
+                        SELECT name, explode(fsq_category_labels[0]) AS category
+                        FROM {self.source_table}
+                    ),
+                    AssociatedCategories AS (
+                        SELECT 
+                            ec1.category AS primary_category, 
+                            ec2.category AS associated_category
+                        FROM ExplodedCategories ec1
+                        JOIN ExplodedCategories ec2 
+                        ON ec1.name = ec2.name AND ec1.category != ec2.category
+                    )
+                    SELECT 
+                        ec.category, 
+                        COUNT(*) AS num_places_of_that_category,
+                        ARRAY_AGG(DISTINCT ac.associated_category) FILTER (WHERE ac_rank <= 5) AS top_3_associated_categories_array
+                    FROM 
+                        ExplodedCategories ec
+                    LEFT JOIN (
+                        SELECT 
+                            primary_category, 
+                            associated_category,
+                            RANK() OVER (PARTITION BY primary_category ORDER BY COUNT(*) DESC) AS ac_rank
+                        FROM AssociatedCategories
+                        GROUP BY primary_category, associated_category
+                    ) ac ON ec.category = ac.primary_category
+                    GROUP BY ec.category)
+                    WHERE category in ({filter_statement})"""
+            )
+            pa_table: pa.Table = cursor.fetchall_arrow()
+            return pa_table.to_pandas()
+
+    def get_zip_codes(self, categories: list[str]) -> pd.DataFrame:
+        with self._connection.cursor() as cursor:
+            filter_statement = ",".join([f"'{c}'" for c in categories])
+            cursor.execute(
+                f"""SELECT postcode, SUM(count_places) as total_places
+                    FROM (
+                        SELECT postcode, count(*) as count_places
+                        FROM (
+                            SELECT explode(fsq_category_labels[0]) as category, postcode, name
+                            FROM {self.source_table}
+                        ) as exploded
+                        WHERE category IN ({filter_statement})
+                        GROUP BY postcode, category
+                    ) as category_counts
+                    GROUP BY postcode"""
+            )
+            pa_table: pa.Table = cursor.fetchall_arrow()
+            return pa_table.to_pandas()
+
+    def get_popular_places(self, categories: list[str], zip_code: int) -> pd.DataFrame:
+        with self._connection.cursor() as cursor:
+            filter_statement = ",".join([f"'{c}'" for c in categories])
+            cursor.execute(
+                f"""SELECT name, MAX(popularity) as popularity, MAX(provenance_rating) as provenance_rating from(
+                        SELECT * FROM(
+                            select name, explode(fsq_category_labels[0]) as category, postcode, round(popularity, 2) as popularity, provenance_rating
+                            from {self.source_table})
+                        WHERE category IN ({filter_statement}) AND postcode == {zip_code})
+                        group by 1
+                        ORDER BY popularity DESC"""
+            )
+            pa_table: pa.Table = cursor.fetchall_arrow()
+            return pa_table.to_pandas()
